@@ -93,11 +93,13 @@ class Cache_Server
     
     protected function releaseClients()
     {
-        foreach($this->clientsList as $client)
+        foreach($this->clientsList as $clientNum=>$client)
         {
             if($client->isTimedOut())
             {
                 $client->destroyChannel();
+                unset($this->cacheStorage[$this->generateClientHash($clientNum)]);
+                unset($this->clientsList[$clientNum]);
             }
         }
     }
