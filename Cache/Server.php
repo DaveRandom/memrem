@@ -11,8 +11,8 @@ class Cache_Server
     const HANDLER_COMMAND_SET_SUCCESS   = 1;
     const HANDLER_COMMAND_SET_FAILURE   = 0;
     
-    protected $clientsList              = [];
-    protected $errorsList               = [];
+    protected $clients                  = [];
+    protected $errors                   = [];
     private   $cacheStorage             = [];
     private   $transport                = null;
     
@@ -34,12 +34,12 @@ class Cache_Server
     //errors functions:
     public function getLastError()
     {
-        return $this->errorsList[count($this->errorsList)-1];
+        return $this->errors[count($this->errors)-1];
     }
     
     public function setError($code, $error)
     {
-        $this->errorsList[]  = [$code => $error];
+        $this->errors[]  = [$code => $error];
     }
     //cache functions:
     public function getKey($client, $key)
@@ -68,13 +68,13 @@ class Cache_Server
     {
         if($client = $this->transport->createChannel())
         {
-            $this->clientsList[] = $client;            
+            $this->clients[] = $client;            
         }
     }
     
     protected function listenClients($bCheckAlive=false)
     {
-        foreach($this->clientsList as $index=>$client)
+        foreach($this->clients as $index=>$client)
         {
             if($data = $client->getData())
             {
@@ -93,13 +93,13 @@ class Cache_Server
     
     protected function releaseClients()
     {
-        foreach($this->clientsList as $clientNum=>$client)
+        foreach($this->clients as $clientNum=>$client)
         {
             if($client->isTimedOut())
             {
                 $client->destroyChannel();
                 unset($this->cacheStorage[$this->generateClientHash($clientNum)]);
-                unset($this->clientsList[$clientNum]);
+                unset($this->clients[$clientNum]);
             }
         }
     }
@@ -114,20 +114,20 @@ class Cache_Server
     
     protected function hook_exit($clientNum, $args)
     {
-        $this->clientsList[$clientNum]->destroyChannel();
-        unset($this->clientsList[$clientNum]);
+        $this->clients[$clientNum]->destroyChannel();
+        unset($this->clients[$clientNum]);
         unset($this->cacheStorage[$this->generateClientHash($clientNum)]);
     }
     
     protected function hook_ping($clientNum, $args)
     {
-        $this->clientsList[$clientNum]->setLastAction();
-        $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_PING_DATA, false);
+        $this->clients[$clientNum]->setLastAction();
+        $this->clients[$clientNum]->sendData(self::HANDLER_COMMAND_PING_DATA, false);
     }
     
     protected function hook_get($clientNum, $args)
     {
-        $this->clientsList[$clientNum]->sendData($this->getKey($clientNum, (string)$args), false);
+        $this->clients[$clientNum]->sendData($this->getKey($clientNum, (string)$args), false);
     }
     
     protected function hook_set($clientNum, $args)
@@ -142,11 +142,11 @@ class Cache_Server
                 {
                     $this->setKey($clientNum, $key, $args[self::HANDLER_COMMAND_SET_DATA]);                    
                 }
-                $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_SET_SUCCESS, false);
+                $this->clients[$clientNum]->sendData(self::HANDLER_COMMAND_SET_SUCCESS, false);
                 return true;
             }
         }
-        $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_SET_FAILURE, false);
+        $this->clients[$clientNum]->sendData(self::HANDLER_COMMAND_SET_FAILURE, false);
         return false;
     }
     

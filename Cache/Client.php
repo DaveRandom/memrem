@@ -11,7 +11,7 @@ class Cache_Client
     const COMMAND_EXIT                  = 'exit';
     const COMMAND_PING                  = 'ping';
     
-    protected   $errorsList             = [];
+    protected   $errors                 = [];
     private     $transport              = null;
     
     
@@ -31,12 +31,12 @@ class Cache_Client
     
     public function getLastError()
     {
-        return $this->errorsList[count($this->errorsList)-1];
+        return $this->errors[count($this->errors)-1];
     }
     
     public function setError($code, $error)
     {
-        $this->errorsList[]  = [$code => $error];
+        $this->errors[]  = [$code => $error];
     }
     
     public function getValue($key)
