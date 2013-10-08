@@ -39,7 +39,7 @@ class Cache_Client
         $this->errorsList[]  = [$code => $error];
     }
     
-    public function getKey($key)
+    public function getValue($key)
     {
         $this->transport->sendData(serialize(
                 [
@@ -54,7 +54,7 @@ class Cache_Client
         return null;
     }
     
-    public function setKey($key, $value)
+    public function setValue($key, $value)
     {      
         $this->transport->sendData(serialize(
                 [
@@ -68,7 +68,7 @@ class Cache_Client
         return (bool)$this->transport->getData(false);
     }
     
-    public function unsetKey($key)
+    public function unsetValue($key)
     {
         $this->transport->sendData(serialize(
                 [

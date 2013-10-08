@@ -6,11 +6,11 @@ register_shutdown_function(function()
     system($sProcess);
 });
 define('APPLICATION_PATH', realpath(dirname(__FILE__)));
-spl_autoload_register(function ($sClass) 
+spl_autoload_register(function ($class) 
 {
-    return require_once(str_replace('_', '/', $sClass) . '.php');
+    return require_once(str_replace('_', '/', $class) . '.php');
 });
 
 
-$rServer = new Cache_Server('127.0.0.1', '23540');
-$rServer->runServer();
+$server = new Cache_Server('127.0.0.1', '23540');
+$server->runServer();

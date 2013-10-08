@@ -76,7 +76,7 @@ class Cache_Server
     {
         foreach($this->clientsList as $index=>$client)
         {
-            if($data = $client->getData()) 
+            if($data = $client->getData())
             {
                 if($command = $this->parseRawCommand($data))
                 {          
