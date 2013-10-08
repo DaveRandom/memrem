@@ -7,11 +7,10 @@ spl_autoload_register(function ($sClass)
 });
 
 
-$rCache = Cache_Client::getInstance()->setServerAddress('127.0.0.1', '23540');
+$rCache = new Cache_Client('127.0.0.1', '23540');
 var_dump($rCache->setKey('test', array(1,'foo', false)));
 var_dump($rCache->getKey('test'));
 
-$rCacheIns = Cache_Client::getInstance();
 
-var_dump($rCacheIns->unsetKey('test'));
-var_dump($rCacheIns->getKey('test'));
+var_dump($rCache->unsetKey('test'));
+var_dump($rCache->getKey('test'));

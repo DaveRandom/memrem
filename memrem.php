@@ -12,5 +12,5 @@ spl_autoload_register(function ($sClass)
 });
 
 
-$rServer = new Cache_Server();
+$rServer = new Cache_Server('127.0.0.1', '23540');
 $rServer->runServer();

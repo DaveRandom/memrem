@@ -4,175 +4,169 @@ class Cache_Server
     const PARSER_RAW_SECTION_COMMAND    = 'raw_command';
     const PARSER_RAW_SECTION_DATA       = 'raw_data';
     
-    const HANDLER_COMMAND_COMMON_PREFIX = '_hook_';
+    const HANDLER_COMMAND_COMMON_PREFIX = 'hook_';
     const HANDLER_COMMAND_SET_KEY       = 'key';
     const HANDLER_COMMAND_SET_DATA      = 'data';
+    const HANDLER_COMMAND_PING_DATA     = 'PONG';
     const HANDLER_COMMAND_SET_SUCCESS   = 1;
     const HANDLER_COMMAND_SET_FAILURE   = 0;
     
-    const SOCKET_BLOCK_READ_SIZE        = 64;
-    const SOCKET_TERMINATE_BYTE         = "\0";
+    protected $clientsList              = [];
+    protected $errorsList               = [];
+    private   $cacheStorage             = [];
+    private   $transport                = null;
     
-    const ERROR_SERVER_SETUP_MESSAGE    = "Could not setup server socket";
-    const ERROR_SERVER_SETUP_CODE       = 2;
-    
-    protected $_sAddress                = '127.0.0.1';
-    protected $_sPort                   = '23540';
-    protected $_rgClients               = array();
-    protected $_rgErrors                = array();
-    private   $__rgCache                = array();
-    private   $__rSocket                = null;
-    
-    public function __construct($sHost=null, $sPort=null) 
+    public function __construct($ipAddress=null, $tcpPort=null) 
     {
-        if(isset($sHost)&&isset($sPort))
-        {           
-            $this->_sAddress= $sHost;
-            $this->_sPort   = $sPort;
-        }
+        //todo: configurable transport type. Now only sockets available, hardcoded:
+        $this->transport = Transport_Socket::createServerFromTCP($ipAddress, $tcpPort, true);
     }
     
     public function runServer()
     {
-        if(!$this->__setup_socket())
-        {
-            $this->setError(self::ERROR_SERVER_SETUP_CODE, self::ERROR_SERVER_SETUP_MESSAGE);
-            return false;
-        }
         while(true)
         {
-            $this->_check_clients();
-            $this->_listen_clients();
+            $this->checkNewClients();
+            $this->listenClients();
+            $this->releaseClients();
         }
     }
     //errors functions:
     public function getLastError()
     {
-        return $this->_rgErrors[count($this->_rgErrors)-1];
+        return $this->errorsList[count($this->errorsList)-1];
     }
     
-    public function setError($iCode, $sMessage)
+    public function setError($code, $error)
     {
-        $this->_rgErrors[]  = array($iCode=>$sMessage);
+        $this->errorsList[]  = [$code => $error];
     }
     //cache functions:
-    public function getKey($mClient, $mKey)
+    public function getKey($client, $key)
     {
-        $sKey   = $this->__generate_key_hash($mClient, $mKey);
-        return array_key_exists($sKey, $this->__rgCache)?$this->__rgCache[$sKey]:null;
+        $key       = $this->generateKeyHash($key);
+        $client    = $this->generateClientHash($client);
+        return array_key_exists($client, $this->cacheStorage) && 
+               array_key_exists($key, $this->cacheStorage[$client])?$this->cacheStorage[$client][$key]:null;
     }
 
-    public function setKey($mClient, $mKey, $mValue)
+    public function setKey($client, $key, $value)
     {
-        if(!isset($mValue))
+        if(!isset($value))
         {
-            unset($this->__rgCache[$this->__generate_key_hash($mClient, $mKey)]);
+            unset($this->cacheStorage[$this->generateClientHash($client)]
+                                     [$this->generateKeyHash($key)]);
         }
         else
         {
-            $this->__rgCache[$this->__generate_key_hash($mClient, $mKey)]=$mValue;
+            $this->cacheStorage[$this->generateClientHash($client)]
+                               [$this->generateKeyHash($key)] = $value;
         }
     }
     //clients functions:
-    protected function _check_clients()
+    protected function checkNewClients()
     {
-        if(($rNewc = @socket_accept($this->__rSocket)) !== false)
+        if($client = $this->transport->createChannel())
         {
-            socket_set_nonblock($rNewc);
-            $this->_rgClients[] = $rNewc;
+            $this->clientsList[] = $client;            
         }
     }
     
-    protected function _listen_clients($bCheckAlive=false)
+    protected function listenClients($bCheckAlive=false)
     {
-        foreach($this->_rgClients as $iIndex => $rClient)
+        foreach($this->clientsList as $index=>$client)
         {
-            if($sData = $this->__get_socket_data($rClient))
+            if($data = $client->getData()) 
             {
-                if($rgCommand = $this->__parse_raw_command($sData))
-                {
-                    $this->_execute_command($iIndex, $rgCommand[self::PARSER_RAW_SECTION_COMMAND], $rgCommand[self::PARSER_RAW_SECTION_DATA]);
+                if($command = $this->parseRawCommand($data))
+                {          
+                    $client->setLastAction();
+                    $this->executeCommand(
+                            $index, 
+                            $command[self::PARSER_RAW_SECTION_COMMAND], 
+                            $command[self::PARSER_RAW_SECTION_DATA]
+                    );                
                 }
             }
         }
     }
-    //command handle functions:
-    protected function _execute_command($mClient, $sCommand, $mParameters)
+    
+    protected function releaseClients()
     {
-        //need to use prefix, so call will be more safe:
-        if(method_exists($this, $sCommand=self::HANDLER_COMMAND_COMMON_PREFIX.$sCommand))
+        foreach($this->clientsList as $client)
         {
-            $this->$sCommand($mClient, $mParameters);
+            if($client->isTimedOut())
+            {
+                $client->destroyChannel();
+            }
         }
     }
     
-    protected function _hook_get($mClient, $mParameters)
+    protected function executeCommand($client, $command, $args)
     {
-        $mClient    = is_resource($mClient)?$mClient:$this->_rgClients[$mClient];
-        $this->__send_socket_data($mClient, $this->getKey($mClient, (string)$mParameters));
+        if(method_exists($this, $command=self::HANDLER_COMMAND_COMMON_PREFIX.$command))
+        {
+            $this->$command($client, $args);
+        }
     }
     
-    protected function _hook_set($mClient, $mParameters)
+    protected function hook_exit($clientNum, $args)
     {
-        $mClient    = is_resource($mClient)?$mClient:$this->_rgClients[$mClient];
-        if($rgParameters = @unserialize($mParameters))
+        $this->clientsList[$clientNum]->destroyChannel();
+        unset($this->clientsList[$clientNum]);
+        unset($this->cacheStorage[$this->generateClientHash($clientNum)]);
+    }
+    
+    protected function hook_ping($clientNum, $args)
+    {
+        $this->clientsList[$clientNum]->setLastAction();
+        $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_PING_DATA, false);
+    }
+    
+    protected function hook_get($clientNum, $args)
+    {
+        $this->clientsList[$clientNum]->sendData($this->getKey($clientNum, (string)$args), false);
+    }
+    
+    protected function hook_set($clientNum, $args)
+    {
+        if($args = @unserialize($args))
         {
-            if(array_key_exists(self::HANDLER_COMMAND_SET_KEY, $rgParameters))
+            if(array_key_exists(self::HANDLER_COMMAND_SET_KEY, $args))
             {
-                $sKey = $rgParameters[self::HANDLER_COMMAND_SET_KEY];
-                $this->setKey($mClient, $sKey, null);
-                if(array_key_exists(self::HANDLER_COMMAND_SET_DATA, $rgParameters))
+                $key    = $args[self::HANDLER_COMMAND_SET_KEY];
+                $this->setKey($clientNum, $key, null);
+                if(array_key_exists(self::HANDLER_COMMAND_SET_DATA, $args))
                 {
-                    $this->setKey($mClient, $sKey, $rgParameters[self::HANDLER_COMMAND_SET_DATA]);                    
+                    $this->setKey($clientNum, $key, $args[self::HANDLER_COMMAND_SET_DATA]);                    
                 }
-                $this->__send_socket_data($mClient, self::HANDLER_COMMAND_SET_SUCCESS);
+                $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_SET_SUCCESS, false);
                 return true;
             }
         }
-        $this->__send_socket_data($mClient, self::HANDLER_COMMAND_SET_FAILURE);
+        $this->clientsList[$clientNum]->sendData(self::HANDLER_COMMAND_SET_FAILURE, false);
         return false;
     }
     
-    private function __generate_key_hash($mClient, $mKey)
+    
+    private function generateClientHash($client)
     {
-        return md5($mClient."\n\n".$mKey);
-    }
-    //socket functions:
-    private function __setup_socket()
-    {
-        $this->__rSocket    = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-        if(!@socket_bind($this->__rSocket,$this->_sAddress,$this->_sPort))
-        {
-            unset($this->__rSocket);
-            return false;
-        }
-        socket_listen($this->__rSocket);
-        socket_set_nonblock($this->__rSocket);
-        return true;
+        return md5($client);
     }
     
-    private function __send_socket_data($rSocket, $sData)
+    private function generateKeyHash($key)
     {
-        return socket_write($rSocket, $sData.self::SOCKET_TERMINATE_BYTE);
+        return md5($key);
     }
     
-    private function __get_socket_data($rSocket)
+    private function parseRawCommand($command)
     {
-        $sResult = false;
-        while($sBuffer = @socket_read($rSocket, self::SOCKET_BLOCK_READ_SIZE))
+        $commandData  = @unserialize($command);
+        if(is_array($commandData) && 
+           array_key_exists(self::PARSER_RAW_SECTION_COMMAND, $commandData))
         {
-            $sResult.=$sBuffer;
+            return $commandData;
         }
-        return $sResult===false?null:$sResult;
-    }
-    
-    private function __parse_raw_command($sData)
-    {
-        $mData  = @unserialize($sData);
-        if(is_array($mData) && array_key_exists(self::PARSER_RAW_SECTION_COMMAND, $mData))
-        {
-            return $mData;
-        }
-        return null;
+        return null;//?
     }
 }
