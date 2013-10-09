@@ -17,12 +17,16 @@ class Server extends SocketServer
     private $address;
 
     /**
-     * @var string TCP port of local socket
+     * @var int TCP port of local socket
      */
     private $port;
 
     /**
      * Constructor
+     *
+     * @param string $address  Network address of local socket
+     * @param int    $port     TCP port of local socket
+     * @param bool   $blocking Blocking mode to set on stream
      */
     public function __construct($address, $port, $blocking = false)
     {
