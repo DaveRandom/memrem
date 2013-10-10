@@ -5,9 +5,10 @@
 
 namespace MemRem\Sockets\TCP;
 
-use MemRem\Sockets\ConnectException;
+use MemRem\Sockets\ClientPeer as SocketClientPeer,
+    MemRem\Sockets\ConnectException;
 
-class ClientPeer extends Peer
+class ClientPeer extends SocketClientPeer
 {
     /**
      * @var string Network address of remote host
@@ -40,13 +41,6 @@ class ClientPeer extends Peer
      */
     public function open()
     {
-        $address = "tcp://{$this->address}:{$this->port}";
-        $flags = $this->isBlocking() ? STREAM_CLIENT_CONNECT : STREAM_CLIENT_ASYNC_CONNECT;
-
-        if (!$socket = stream_socket_client($address, $errNo, $errStr, $flags)) {
-            throw new ConnectException($errStr, $errNo);
-        }
-
-        $this->setStream($socket);
+        $this->connect("tcp://{$this->address}:{$this->port}");
     }
 }

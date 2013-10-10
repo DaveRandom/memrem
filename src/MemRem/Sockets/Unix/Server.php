@@ -35,36 +35,6 @@ class Server extends SocketServer
      */
     public function open()
     {
-        $address = "unix://{$this->path}";
-
-        if (false === $socket = stream_socket_server($address, $errNo, $errStr)) {
-            throw new BindException($errStr, $errNo);
-        }
-
-        $this->setStream($socket);
-    }
-
-    /**
-     * Close and unreference the underlying stream
-     */
-    public function close()
-    {
-        fclose($this->socket);
-        $this->unsetStream();
-    }
-
-    /**
-     * Accept a pending connection
-     *
-     * @return Peer
-     * @throws AcceptException
-     */
-    public function accept()
-    {
-        if (!$client = stream_socket_accept($this->getStream())) {
-            throw new AcceptException('accept() operation failed');
-        }
-
-        return new ServerPeer($client, $this->isBlocking());
+        $this->bindAndListen("unix://{$this->path}");
     }
 }
