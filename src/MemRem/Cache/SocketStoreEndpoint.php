@@ -38,6 +38,45 @@ abstract class SocketStoreEndpoint
     const ERRCLASS_SERVER = 2;
 
     /**
+     * Split a message code into its component parts
+     *
+     * Returns an array of the form
+     * [
+     *    bool $isResponse
+     *    int  $messageClass
+     *    int  $messageCode
+     * ]
+     *
+     * @param int $code The message code
+     * @return mixed[]
+     */
+    protected function parseMessageCode($code)
+    {
+        $code = ((int) $code) & 0xFFFF;
+
+        return [
+            (bool) $code & 0x8000,
+            ($code & 0x7000) >> 12,
+            $code & 0x0FFF
+        ];
+    }
+
+    /**
+     * Build a message code from its component parts
+     *
+     * @param bool $isResponse   true if the message is a response
+     * @param int  $messageClass Single octal digit for message class
+     * @param bool $messageCode  Message code
+     * @return int
+     */
+    protected function buildMessageCode($isResponse, $messageClass, $messageCode)
+    {
+        return (((int)(bool) $isResponse) << 15)
+             | ((((int) $messageClass) & 0x0007) << 11)
+             | (((int) $messageCode) & 0x0FFF);
+    }
+
+    /**
      * Encode a message for transmission over the wire
      *
      * @param int   $code The message code
@@ -58,7 +97,7 @@ abstract class SocketStoreEndpoint
     protected function decodeMessage($message)
     {
         if (!($result = unserialize(rtrim($message))) || !isset($result['code']) || !array_key_exists('data', $result)) {
-            throw new RuntimeException('Protocol error');
+            throw new ProtocolException('Message format invalid');
         }
 
         return $result;

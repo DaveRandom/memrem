@@ -29,22 +29,25 @@ class SocketStoreClient extends SocketStoreEndpoint implements KeyValueStore
         $this->socket->write($this->encodeMessage($code, $data));
 
         $result = $this->decodeMessage($this->socket->readLine());
+        $messageCode = (int) $result['code'];
 
-        if ($result['code'] !== self::RESPONSE_OK) {
-            $errCode  = (int) $result['code'];
-            $errClass = ($errCode & 0x7000) >> 12;
-            $errNo    = $errCode & 0x0FFF;
-            $errStr   = (string) $result['data'];
+        if ($messageCode !== self::RESPONSE_OK) {
+            $errStr = (string) $result['data'];
+            list($isResponse, $errClass, $errNo) = $this->parseMessageCode($messageCode);
 
-            switch ($errClass) {
-                case self::ERRCLASS_CLIENT:
-                    throw new ClientErrorException("{$errClass}/{$errNo}: {$errStr}", $errCode);
+            if (!$isResponse) {
+                throw new ProtocolException('Unexpected message type: Message is request, expecting response');
+            } else {
+                switch ($errClass) {
+                    case self::ERRCLASS_CLIENT:
+                        throw new ClientErrorException("{$errClass}/{$errNo}: {$errStr}", $messageCode);
 
-                case self::ERRCLASS_SERVER:
-                    throw new ServerErrorException("{$errClass}/{$errNo}: {$errStr}", $errCode);
+                    case self::ERRCLASS_SERVER:
+                        throw new ServerErrorException("{$errClass}/{$errNo}: {$errStr}", $messageCode);
 
-                default:
-                    throw new UnknownErrorException("{$errClass}/{$errNo}: {$errStr}", $errCode);
+                    default:
+                        throw new UnknownErrorException("{$errClass}/{$errNo}: {$errStr}", $messageCode);
+                }
             }
         }
 
