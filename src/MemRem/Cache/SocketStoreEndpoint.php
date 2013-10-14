@@ -93,11 +93,12 @@ abstract class SocketStoreEndpoint
      *
      * @param string $message The raw message
      * @return mixed[] Associative array with the key 'code' and 'data'
+     * @throws ProtocolErrorException
      */
     protected function decodeMessage($message)
     {
         if (!($result = unserialize(rtrim($message))) || !isset($result['code']) || !array_key_exists('data', $result)) {
-            throw new ProtocolException('Message format invalid');
+            throw new ProtocolErrorException('Message format invalid');
         }
 
         return $result;

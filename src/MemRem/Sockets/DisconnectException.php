@@ -5,6 +5,4 @@
 
 namespace MemRem\Sockets;
 
-use RuntimeException;
-
-class DisconnectException extends RuntimeException {};
+class DisconnectException extends TransportException {};

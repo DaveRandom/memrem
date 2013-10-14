@@ -10,7 +10,46 @@ abstract class Peer extends Socket
     /**
      * @var string Pending read data buffer
      */
-    private $buffer = '';
+    private $readBuffer = '';
+
+    /**
+     * Read a complete newline-terminated data block from the socket
+     *
+     * If a partial block is received, for example because not all necessary
+     * packets have arrived, the received data is stored and null is returned.
+     *
+     * @return string|null
+     * @throws ReadException
+     */
+    protected function bufferedReadLine()
+    {
+        $socket = $this->getStream();
+        $result = null;
+
+        while (true) {
+            if (false === $chunk = fgets($socket)) {
+                if ($this->isEOF()) {
+                    throw new DisconnectException('The remote host closed the connection unexpectedly');
+                } else {
+                    throw new ReadException('Read operation on socket failed');
+                }
+            }
+
+            if ($chunk === '') {
+                break;
+            } else {
+                $this->readBuffer .= $chunk;
+
+                if (substr($chunk, -1) === "\n") {
+                    $result = $this->readBuffer;
+                    $this->readBuffer = '';
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
 
     /**
      * Determine whether the socket has reached EOF
@@ -37,42 +76,15 @@ abstract class Peer extends Socket
     }
 
     /**
-     * Read a complete newline-terminated data block from the socket
-     *
-     * If a partial block is received, for example because not all necessary
-     * packets have arrived, the received data is stored and null is returned.
+     * Read a complete newline-terminated data block from the socket if one
+     * is available
      *
      * @return string|null
      * @throws ReadException
      */
     public function readLine()
     {
-        $socket = $this->getStream();
-        $result = null;
-
-        while (true) {
-            if (false === $chunk = fgets($socket)) {
-                if ($this->isEOF()) {
-                    throw new DisconnectException('The remote host closed the connection unexpectedly');
-                } else {
-                    throw new ReadException('Read operation on socket failed');
-                }
-            }
-
-            if ($chunk === '') {
-                break;
-            } else {
-                $this->buffer .= $chunk;
-
-                if (substr($chunk, -1) === "\n") {
-                    $result = $this->buffer;
-                    $this->buffer = '';
-                    break;
-                }
-            }
-        }
-
-        return $result;
+        return $this->bufferedReadLine();
     }
 
     /**

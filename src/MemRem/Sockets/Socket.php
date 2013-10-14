@@ -92,7 +92,7 @@ abstract class Socket
         $this->blocking = (bool) $blocking;
 
         if ($this->stream) {
-            stream_set_blocking($this->stream, $this->blocking);
+            stream_set_blocking($this->stream, $blocking);
         }
     }
 

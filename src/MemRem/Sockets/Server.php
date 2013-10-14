@@ -13,13 +13,30 @@ abstract class Server extends Socket
      * @param string $address Local socket spec
      * @throws BindException
      */
-    protected function bindAndListen($address)
+    protected function bind($address, $extraFlags = 0, $context = null)
     {
-        if (false === $stream = stream_socket_server($address, $errNo, $errStr)) {
+        $flags = STREAM_SERVER_BIND | $extraFlags;
+
+        if (false === $stream = stream_socket_server($address, $errNo, $errStr, $flags, $context)) {
             throw new BindException($errStr, $errNo);
         }
 
         $this->setStream($stream);
+    }
+
+    /**
+     * Accepts a pending connection and returns the stream
+     *
+     * @return resource
+     * @throws AcceptException
+     */
+    protected function acceptClient()
+    {
+        if (!$stream = stream_socket_accept($this->getStream())) {
+            throw new AcceptException('accept() operation failed');
+        }
+
+        return $stream;
     }
 
     /**
@@ -32,17 +49,13 @@ abstract class Server extends Socket
     }
 
     /**
-     * Accept a pending connection
+     * Accept a pending connection and returns a ServerPeer
      *
      * @return ServerPeer
      * @throws AcceptException
      */
     public function accept()
     {
-        if (!$stream = stream_socket_accept($this->getStream())) {
-            throw new AcceptException('accept() operation failed');
-        }
-
-        return new ServerPeer($stream);
+        return new ServerPeer($this->acceptClient());
     }
 }

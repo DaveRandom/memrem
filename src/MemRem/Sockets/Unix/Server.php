@@ -6,7 +6,6 @@
 namespace MemRem\Sockets\Unix;
 
 use MemRem\Sockets\Server as SocketServer,
-    MemRem\Sockets\AcceptException,
     MemRem\Sockets\BindException;
 
 class Server extends SocketServer
@@ -35,6 +34,6 @@ class Server extends SocketServer
      */
     public function open()
     {
-        $this->bindAndListen("unix://{$this->path}");
+        $this->bind("unix://{$this->path}", STREAM_SERVER_LISTEN);
     }
 }

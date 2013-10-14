@@ -6,7 +6,6 @@
 namespace MemRem\Sockets\TCP;
 
 use MemRem\Sockets\Server as SocketServer,
-    MemRem\Sockets\AcceptException,
     MemRem\Sockets\BindException;
 
 class Server extends SocketServer
@@ -42,6 +41,6 @@ class Server extends SocketServer
      */
     public function open()
     {
-        $this->bindAndListen("tcp://{$this->address}:{$this->port}");
+        $this->bind("tcp://{$this->address}:{$this->port}", STREAM_SERVER_LISTEN);
     }
 }
