@@ -12,7 +12,7 @@ $cache->open();
 $key = 'foo';
 $value = 'bar';
 
-if (!isset($cache['foo'])) {
+if (!isset($cache[$key])) {
     echo "Setting key '$key' to '$value'\n";
     $cache[$key] = $value;
 } else {

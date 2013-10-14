@@ -49,14 +49,14 @@ class Server extends SocketServer
      */
     public function open()
     {
-        $context = stream_context_create([
+        $contextOpts = [
             'ssl' => [
                 'local_cert' => $this->certPath,
                 'disable_compression' => true
             ]
-        ]);
+        ];
 
-        $this->bind("tcp://{$this->address}:{$this->port}", STREAM_SERVER_LISTEN, $context);
+        $this->bind("tcp://{$this->address}:{$this->port}", STREAM_SERVER_LISTEN, $contextOpts);
     }
 
     /**

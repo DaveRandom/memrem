@@ -13,9 +13,10 @@ abstract class Server extends Socket
      * @param string $address Local socket spec
      * @throws BindException
      */
-    protected function bind($address, $extraFlags = 0, $context = null)
+    protected function bind($address, $extraFlags = 0, array $contextOpts = [])
     {
         $flags = STREAM_SERVER_BIND | $extraFlags;
+        $context = stream_context_create($contextOpts);
 
         if (false === $stream = stream_socket_server($address, $errNo, $errStr, $flags, $context)) {
             throw new BindException($errStr, $errNo);
